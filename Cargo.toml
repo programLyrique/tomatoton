@@ -1,0 +1,10 @@
+[package]
+name = "tomatoton"
+version = "0.1.0"
+authors = ["pierre"]
+
+[dependencies]
+csv = "*"
+serde = "*"
+serde_derive = "*"
+chrono = {version = "*", features = ["serde"]}
