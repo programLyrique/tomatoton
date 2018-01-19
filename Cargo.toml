@@ -7,4 +7,3 @@ authors = ["pierre"]
 csv = "*"
 serde = "*"
 serde_derive = "*"
-chrono = {version = "*", features = ["serde"]}
