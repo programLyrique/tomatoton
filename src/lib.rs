@@ -1,17 +1,22 @@
-extern crate csv;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate csv;
 extern crate chrono;
 
 use std::time;
+use std::fs::{File, OpenOptions};
 use serde::Serialize;
+use std::error::Error;
+use std::io::prelude::*;
+use std::path::Path;
+use csv::WriterBuilder;
 
 
 
 #[derive(Debug, Serialize, Clone, Copy)]
 #[serde(rename_all = "PascalCase")]
-enum Status {
+pub enum Status {
     Completed,
     Aborted,
     Running,
@@ -19,7 +24,7 @@ enum Status {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "PascalCase")]
-enum Kind {
+pub enum Kind {
     Task(String),//Description of the task
     Break,
 }
@@ -32,7 +37,7 @@ type DateTime = chrono::DateTime<chrono::Utc>;
 /// A Pomodoro is any kind of action starting at some date and lasting for some duration
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "PascalCase")]
-struct Pomodoro {
+pub struct Pomodoro {
     start_time: DateTime,
     duration: time::Duration,
     expected_duration: time::Duration,
@@ -51,7 +56,7 @@ impl Pomodoro {
         }
     }
 
-    fn new_task(start_time : DateTime, expected_duration : time::Duration, description: String) -> Pomodoro {
+    pub fn new_task(start_time : DateTime, expected_duration : time::Duration, description: String) -> Pomodoro {
         Pomodoro {
             start_time,
             duration: time::Duration::from_secs(0),
@@ -61,7 +66,7 @@ impl Pomodoro {
         }
     }
 
-    fn new_break(start_time : DateTime, expected_duration : time::Duration) -> Pomodoro {
+    pub fn new_break(start_time : DateTime, expected_duration : time::Duration) -> Pomodoro {
         Pomodoro {
             start_time,
             duration: time::Duration::from_secs(0),
@@ -72,17 +77,17 @@ impl Pomodoro {
     }
 
     /// Abort the Pomodoro
-    fn abort(&mut self) {
+    pub fn abort(&mut self) {
         self.status = Status::Aborted;
     }
 
     /// Whether the Pomodoro is finished, comparing current duration with the expected duration
-    fn is_finished(&self) -> bool {
+    pub fn is_finished(&self) -> bool {
         self.duration >= self.expected_duration
     }
 
     /// Update the current duration of the pomodoro
-    fn update(&mut self, current_time : DateTime) -> Status {
+    pub fn update(&mut self, current_time : DateTime) -> Status {
         match self.status {
             Status::Running => {
                 let old_duration = current_time.signed_duration_since(self.start_time);
@@ -98,10 +103,30 @@ impl Pomodoro {
         }
 
 
-    /// Write the pomodoro to the database
-    fn write(&self, database: &mut Database) {
-
-    }
 }
 
-struct Database;
+pub struct Database {
+    writer: csv::Writer<std::fs::File>,
+}
+
+impl Database {
+    pub fn open<P: AsRef<Path>>(path : &P) -> Result<Database, Box<Error>> {
+        //Open the path in append mode
+        let file = OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(path)?;
+
+        //Make it so that it adds rows to the file
+        let writer = WriterBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(false)
+            .from_writer(file);
+        Ok(Database {writer })
+    }
+
+    pub fn serialize(&mut self, pomodoro: &Pomodoro) -> Result<(), Box<Error>> {
+        self.writer.serialize(pomodoro)?;
+        Ok(())
+    }
+}
