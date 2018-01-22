@@ -2,13 +2,14 @@ extern crate csv;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate chrono;
 
 use std::time;
 use serde::Serialize;
 
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Clone, Copy)]
 #[serde(rename_all = "PascalCase")]
 enum Status {
     Completed,
@@ -16,20 +17,15 @@ enum Status {
     Running,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "PascalCase")]
 enum Kind {
     Task(String),//Description of the task
     Break,
 }
 
-impl Serialize for time::Instant {
-    fn serialize<S>(&self, serializer: S) -> Result<S:Ok, S::Error>
-        where S: Serializer
-    {
-        serializer.serialize(self.duration_since(time::UNIX_EPOCH))
-    }
-}
+type DateTime = chrono::DateTime<chrono::Utc>;
+
 
 /// Representation of a Pomodoro.
 ///
@@ -37,7 +33,7 @@ impl Serialize for time::Instant {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "PascalCase")]
 struct Pomodoro {
-    start_time: time::Instant,
+    start_time: DateTime,
     duration: time::Duration,
     expected_duration: time::Duration,
     status: Status,
@@ -45,7 +41,7 @@ struct Pomodoro {
 }
 
 impl Pomodoro {
-    fn new(start_time : time::Instant, expected_duration : time::Duration, kind : Kind) -> Pomodoro {
+    fn new(start_time : DateTime, expected_duration : time::Duration, kind : Kind) -> Pomodoro {
         Pomodoro {
             start_time,
             duration: time::Duration::from_secs(0),
@@ -55,7 +51,7 @@ impl Pomodoro {
         }
     }
 
-    fn new_task(start_time : time::Instant, expected_duration : time::Duration, description: String) -> Pomodoro {
+    fn new_task(start_time : DateTime, expected_duration : time::Duration, description: String) -> Pomodoro {
         Pomodoro {
             start_time,
             duration: time::Duration::from_secs(0),
@@ -65,7 +61,7 @@ impl Pomodoro {
         }
     }
 
-    fn new_break(start_time : time::Instant, expected_duration : time::Duration) -> Pomodoro {
+    fn new_break(start_time : DateTime, expected_duration : time::Duration) -> Pomodoro {
         Pomodoro {
             start_time,
             duration: time::Duration::from_secs(0),
@@ -86,10 +82,11 @@ impl Pomodoro {
     }
 
     /// Update the current duration of the pomodoro
-    fn update(&mut self, current_time : time::Instant) -> Status {
+    fn update(&mut self, current_time : DateTime) -> Status {
         match self.status {
             Status::Running => {
-                self.duration = current_time - self.start_time;
+                let old_duration = current_time.signed_duration_since(self.start_time);
+                self.duration = old_duration.to_std().unwrap();
                 if self.duration >= self.expected_duration {
                     self.status = Status::Completed;
                 }
