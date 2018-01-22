@@ -14,7 +14,7 @@ use csv::WriterBuilder;
 
 
 
-#[derive(Debug, Serialize, Clone, Copy)]
+#[derive(Debug, Serialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "PascalCase")]
 pub enum Status {
     Completed,
@@ -78,7 +78,9 @@ impl Pomodoro {
 
     /// Abort the Pomodoro
     pub fn abort(&mut self) {
-        self.status = Status::Aborted;
+        if self.status != Status::Completed {
+            self.status = Status::Aborted;
+        }    
     }
 
     /// Whether the Pomodoro is finished, comparing current duration with the expected duration
@@ -101,8 +103,6 @@ impl Pomodoro {
             }
 
         }
-
-
 }
 
 pub struct Database {
@@ -128,5 +128,30 @@ impl Database {
     pub fn serialize(&mut self, pomodoro: &Pomodoro) -> Result<(), Box<Error>> {
         self.writer.serialize(pomodoro)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_abort() {
+        let now = chrono::Utc::now();
+        let mut pomodoro = Pomodoro::new_task(now, time::Duration::from_secs(60 * 25), String::from("A simple task"));
+        pomodoro.update(now.checked_add_signed(chrono::Duration::minutes(5)).unwrap());
+        pomodoro.abort();
+
+        assert_eq!(pomodoro.status, Status::Aborted);
+    }
+
+    #[test]
+    fn test_completed() {
+        let now = chrono::Utc::now();
+        let mut pomodoro = Pomodoro::new_task(now, time::Duration::from_secs(60 * 25), String::from("A simple task"));
+        pomodoro.update(now.checked_add_signed(chrono::Duration::minutes(25)).unwrap());
+
+        assert_eq!(pomodoro.status, Status::Completed);
+        assert!(pomodoro.duration >= pomodoro.expected_duration);
     }
 }
